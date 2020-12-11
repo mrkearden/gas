@@ -1,0 +1,166 @@
+Header
+  CHECK KEYWORDS Warn
+  Mesh DB "." "box"
+  Include Path ""
+  Results Directory ""
+End
+
+Simulation
+  Max Output Level = 5
+  Coordinate System = Cartesian
+  Coordinate Mapping(3) = 1 2 3
+  Simulation Type = Transient
+  Steady State Max Iterations = 1
+  Output Intervals = 10
+  Timestepping Method = BDF
+  Newmark Beta = 0.5
+  BDF Order = 2
+  Timestep Intervals = 1000
+  Timestep Sizes = 0.001
+  Solver Input File = case_transient.sif
+  Post File = case_transient.vtu
+! tank should be in meters
+  coordinate scaling(3) = .001 .001  .001
+End
+
+Constants
+  Gravity(4) = 0 -1 0 9.82
+  Stefan Boltzmann = 5.67e-08
+  Permittivity of Vacuum = 8.8542e-12
+  Boltzmann Constant = 1.3807e-23
+  Unit Charge = 1.602e-19
+End
+
+Body 1
+  Target Bodies(1) = 1
+  Name = "Body 1"
+  Equation = 1
+  Material = 1
+  initial Condition = 1
+End
+
+$tol=5.0e-4
+Solver 1
+  Equation = Navier-Stokes
+
+! Enforces solver to always be in steady state
+  Steady State Condition = Real 1.0
+
+  Stabilization Method = String Bubbles
+!  Stabilize = True
+  Optimize Bandwidth = True
+
+! We just take one step. This may not be optimal but the
+! at the beginning the 2nd iteration would be difficult
+! without turbulence.
+  Nonlinear System Max Iterations = 1
+  Nonlinear System Convergence Tolerance = 1.0e-4
+  Nonlinear System Newton After Iterations = 3
+  Nonlinear System Newton After Tolerance  = 0
+  Nonlinear System Relaxation Factor = 0.25
+
+  Linear System Solver = Iterative
+  Linear System Max Iterations = 2500
+  Linear System Iterative Method = BiCGStabL
+  Linear System Preconditioning = ILU0
+  Linear System Convergence Tolerance = 1.0e-5
+  
+  Steady State Convergence Tolerance = 1.0e-4
+  Transient Convergence Measure = String "solution"
+  Transient Convergence Tolerance = Real $tol
+End
+
+
+Solver 2
+  Equation = Kepsilon
+  Procedure = "KEpsSolver" "KEpsSolver"
+
+! This keyword activate the e/k auxiary variable as in Kuzmin and Mierka. 
+! This should make the numerical system better behaving.
+  Use KE ratio = Logical True
+
+! We still use bubbles. FCT testing is the natural next step. 
+  Stabilization Method = String Bubbles
+  Optimize Bandwidth = True
+  
+  Nonlinear System Max Iterations = 1
+  Nonlinear System Convergence Tolerance = 1.0e-4
+  Nonlinear System Relaxation Factor = 0.25 
+
+  Linear System Solver = Iterative
+  Linear System Max Iterations = 2500
+  Linear System Iterative Method = BiCGStabL
+  Linear System Preconditioning = ILU0
+  Linear System Convergence Tolerance = 1.0e-5
+
+  Steady State Convergence Tolerance = 1.0e-4
+! We have introduced new control on pseudo-transient level.
+  Transient Convergence Measure = String "solution"
+  Transient Convergence Tolerance = Real $tol
+End
+
+
+Equation 1 :: Active Solvers(2) = 1 2
+
+Initial Condition 1
+  Name = "InitialCondition 1"
+  Kinetic Energy = 0.2
+  Velocity 2 = 0
+  Kinetic Dissipation = 1.0
+  Velocity 1 = 0
+  Velocity 3 = 0
+End
+
+Material 1
+  Name = "Air (room temperature)"
+  Viscosity = 1.983e-5
+  Relative Permittivity = 1.00059
+  Sound speed = 343.0
+  Heat expansion Coefficient = 3.43e-3
+  Density = 1.205
+  Heat Capacity = 1005.0
+  Heat Conductivity = 0.0257
+
+  KE SigmaK = 1.00
+  KE SigmaE = 1.30
+  KE C1     = 1.44
+  KE C2     = 1.92
+  KE Cmu    = 0.09
+  Viscosity Model = ke
+
+! Keyword related to the old limiter strategy
+  KE Clip   = Real 1.0e-6
+
+! Keywords related to using the eps/k ratio.
+  Minimum Turbulent Viscosity = Real 1.983E-1
+  Maximum Turbulent Mixing Length = Real 1.0
+
+End
+
+Boundary Condition 1
+  Name = "Inlet"
+  Target Boundaries(1) = 1
+  Velocity 2 = 0
+  Velocity 3 = 0
+  Velocity 1 = Variable Coordinate
+    Real MATC "1.2*(1-(tx(1)^2+(tx(2)-0.007)^2)/0.0021^2)"
+Kinetic Energy = 0.001
+Kinetic Dissipation = 0.0025
+End
+
+Boundary Condition 2
+  Name = "Wall"
+  Target Boundaries(1) = 2
+  Noslip wall BC = True
+  Wall Law = True
+  Normal-Tangential Velocity = True
+  Boundary Layer Thickness = 0.01
+  Mass Consistent Normals = Logical True
+End
+
+Boundary Condition 3
+  Name = "Outlet"
+  Target Boundaries(1) = 3
+  Velocity 1 = 0
+  Velocity 3 = 0
+End
